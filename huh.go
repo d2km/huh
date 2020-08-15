@@ -4,9 +4,11 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"strings"
+	"unicode"
 )
 
 var commands = map[string]func([]string) int{
@@ -102,28 +104,36 @@ func wc(args []string) int {
 }
 
 func wcFile(job wcJob, flags map[string]bool, c chan string) {
-	var result wcResult
+	var (
+		result = wcResult{}
+		isWord = false
+	)
 
-	scanner := bufio.NewScanner(bufio.NewReader(job.file))
-	scanner.Split(bufio.ScanLines)
-	for scanner.Scan() {
-		result.lines++
-		if flags["c"] {
-			result.chars += uint64(len(scanner.Bytes())) + 1 // add line break
-		} else if flags["m"] {
-			rs := bufio.NewScanner(strings.NewReader(scanner.Text()))
-			rs.Split(bufio.ScanRunes)
-			for rs.Scan() {
-				result.runes++
+	reader := bufio.NewReader(job.file)
+
+	for {
+		if r, sz, err := reader.ReadRune(); err != nil {
+			if err == io.EOF {
+				break
+			} else {
+				log.Fatal(err)
 			}
-			result.runes++ // add line break
-		}
+		} else {
+			result.runes++
+			result.chars += uint64(sz)
 
-		if flags["w"] {
-			ws := bufio.NewScanner(strings.NewReader(scanner.Text()))
-			ws.Split(bufio.ScanWords)
-			for ws.Scan() {
-				result.words++
+			if r == '\n' {
+				result.lines++
+			}
+			if unicode.IsSpace(r) {
+				if isWord {
+					isWord = false
+					result.words++
+				}
+			} else {
+				if !isWord {
+					isWord = true
+				}
 			}
 		}
 	}
