@@ -91,9 +91,8 @@ func wc(args []string) int {
 
 	channels := make([]chan string, len(jobs))
 	for i, job := range jobs {
-		c := make(chan string)
-		channels[i] = c
-		go wcFile(job, flags, c)
+		channels[i] = make(chan string)
+		go wcFile(job, flags, channels[i])
 	}
 
 	for _, c := range channels {
