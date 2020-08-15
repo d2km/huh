@@ -87,14 +87,21 @@ func wc(args []string) int {
 		}
 	}
 
-	for _, job := range jobs {
-		wcFile(&job, flags)
+	channels := make([]chan string, len(jobs))
+	for i, job := range jobs {
+		c := make(chan string)
+		channels[i] = c
+		go wcFile(job, flags, c)
+	}
+
+	for _, c := range channels {
+		fmt.Printf("%s\n", <-c)
 	}
 
 	return 0
 }
 
-func wcFile(job *wcJob, flags map[string]bool) {
+func wcFile(job wcJob, flags map[string]bool, c chan string) {
 	var result wcResult
 
 	scanner := bufio.NewScanner(bufio.NewReader(job.file))
@@ -121,23 +128,27 @@ func wcFile(job *wcJob, flags map[string]bool) {
 		}
 	}
 
-	wcPrint(&result, job.name, flags)
+	c <- wcPrintStr(&result, job.name, flags)
 }
 
-func wcPrint(r *wcResult, name string, flags map[string]bool) {
+func wcPrintStr(r *wcResult, name string, flags map[string]bool) string {
+	var s string
+
 	if flags["l"] {
-		fmt.Printf("%8d", r.lines)
+		s += fmt.Sprintf("%8d", r.lines)
 	}
 	if flags["w"] {
-		fmt.Printf("%8d", r.words)
+		s += fmt.Sprintf("%8d", r.words)
 	}
 	if flags["c"] {
-		fmt.Printf("%8d", r.chars)
+		s += fmt.Sprintf("%8d", r.chars)
 	} else if flags["m"] {
-		fmt.Printf("%8d", r.runes)
+		s += fmt.Sprintf("%8d", r.runes)
 	}
 
-	fmt.Printf(" %s\n", name)
+	s += fmt.Sprintf(" %s", name)
+
+	return s
 }
 
 func parseFlags(args []string, expected string) (map[string]bool, []string, error) {
